@@ -605,6 +605,10 @@ Ver otra vez</button>
 </button>
 <div style="font-size: 16px; color: #94a3b8">Con sonido · aprox. 1 minuto · narrado en castellano</div>
 <a href="index.html" style="font-size: 16px; font-weight: 700">Watch in English →</a>
+<sc-if value="{{recorded}}" hint-placeholder-val="{{ false }}">
+<div style="font-size: 14px; color: #6ee7b7">Narración grabada · suena igual en cualquier dispositivo</div>
+</sc-if>
+<sc-if value="{{showVoicePick}}" hint-placeholder-val="{{ true }}">
 <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px">
 <label for="voicePick" style="font-size: 15px; font-weight: 600; color: #cbd5e1">Voz</label>
 <select id="voicePick" class="voiceSel" value="{{voiceKey}}" onChange="{{pickVoice}}">
@@ -614,6 +618,7 @@ Ver otra vez</button>
 </select>
 <button class="ctl" type="button" aria-label="Probar esta voz" onClick="{{testVoice}}" style="width: auto; padding: 0 14px; font: 600 14px 'Plus Jakarta Sans', sans-serif">Probar voz</button>
 </div>
+</sc-if>
 <sc-if value="{{noVoice}}" hint-placeholder-val="{{ false }}">
 <div style="font-size: 14px; color: #fda4af">No se ha encontrado ninguna voz en español en este dispositivo. Se mostrarán los subtítulos.</div>
 </sc-if>
@@ -634,6 +639,42 @@ class DCLogic {
   renderVals() { return {}; }
 }
 
+
+/* ---------- narracion grabada ----------------------------------------
+   Si existe audio/manifest.json, la narracion sale de ficheros MP3 grabados
+   con voces neuronales, y suena igual en cualquier aparato. Si no, la pone la
+   voz del navegador, como hasta ahora.
+   El manifest guarda el texto de cada escena: si se cambia el guion y no se
+   vuelve a grabar, esa escena detecta que la grabacion no corresponde y pasa
+   sola a la voz del navegador, en vez de narrar algo que ya no toca.
+   Se graba con tools/build_ad.py (ver tools/README.md). */
+var AD_LANG = "es";
+var AUDIO_DIR = "audio/";
+var adScenes = null;                     /* null = sin comprobar aun */
+function loadAdAudio(cb) {
+  if (adScenes !== null || typeof fetch === "undefined") { if (cb) cb(); return; }
+  adScenes = [];
+  var fin = function () { if (cb) cb(); };
+  try {
+    fetch(AUDIO_DIR + "manifest.json", { cache: "no-cache" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var l = j && j.langs && j.langs[AD_LANG];
+        if (l && l.scenes) adScenes = l.scenes;
+        fin();
+      })
+      .catch(fin);
+  } catch (e) { fin(); }
+}
+function recordedScene(i) {
+  var r = adScenes && adScenes[i];
+  return (r && r.f && r.t === SCENES[i].say) ? r : null;
+}
+function hasRecording() {
+  if (!adScenes || adScenes.length !== SCENES.length) return false;
+  for (var i = 0; i < SCENES.length; i++) if (!recordedScene(i)) return false;
+  return true;
+}
 
 var SCENES = [
   { say: "¿Y si aprender inglés fuera tan emocionante como tu videojuego favorito?",
@@ -698,7 +739,7 @@ function rnd(seed) { var x = seed; return function () { x = (x * 16807) % 214748
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { playing: false, finished: false, scene: 0, word: -1, karaoke: false, music: true, voices: [], voiceKey: "" };
+    this.state = { playing: false, finished: false, scene: 0, music: true, voices: [], voiceKey: "" };
     this.run = 0; this.timers = [];
     var r = rnd(7);
     this.stars = []; for (var i = 0; i < 46; i++) this.stars.push({ x: (r() * 100).toFixed(1), y: (r() * 70).toFixed(1), r: (1 + r() * 2.4).toFixed(1), d: (r() * 3).toFixed(2) });
@@ -729,6 +770,7 @@ class Component extends DCLogic {
     var self = this;
     this.loadVoices();
     try { if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = function () { self.loadVoices(); }; } catch (e) {}
+    loadAdAudio(function () { self.setState({}); });
     this.later(function () { self.voicesChecked = true; self.loadVoices(); }, 1500);
   }
   componentWillUnmount() { this.halt(); try { if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = null; } catch (e) {} }
@@ -755,36 +797,72 @@ class Component extends DCLogic {
     this.run++;
     this.timers.forEach(clearTimeout); this.timers = [];
     try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
+    this.stopAudio();
     this.stopMusic(0.25);
+  }
+  stopAudio() {
+    if (this.audioEl) {
+      try { this.audioEl.pause(); this.audioEl.onended = null; this.audioEl.onerror = null; } catch (e) {}
+      this.audioEl = null;
+    }
   }
   go(i, id) {
     var self = this;
     if (id !== this.run) return;
-    if (i >= SCENES.length) { this.setState({ playing: false, finished: true, scene: SCENES.length - 1, word: 9999 }); this.stopMusic(3.5); return; }
+    if (i >= SCENES.length) { this.setState({ playing: false, finished: true, scene: SCENES.length - 1 }); this.stopMusic(3.5); return; }
     var sc = SCENES[i], est = this.est(sc), t0 = Date.now(), done = false;
-    this.setState({ scene: i, word: -1 });
+    this.setState({ scene: i });
     this.whoosh(i === SCENES.length - 1);
-    var next = function () {
+
+    /* Pasa a la escena siguiente. Con la voz del navegador se respeta un
+       minimo estimado, porque algunos motores avisan del final antes de
+       tiempo; con la grabacion el final es exacto y no hace falta. */
+    var advance = function (conMinimo) {
       if (done || id !== self.run) return;
-      var min = est * 550 - (Date.now() - t0);
-      if (min > 0) { self.later(next, min); return; }
+      if (conMinimo) {
+        var min = est * 550 - (Date.now() - t0);
+        if (min > 0) { self.later(function () { advance(true); }, min); return; }
+      }
       done = true;
-      self.setState({ word: 9999 });
       self.later(function () { self.go(i + 1, id); }, sc.hold || 650);
     };
+    var next = function () { advance(true); };
+
+    /* 1 - narracion grabada */
+    var rec = recordedScene(i);
+    if (rec) {
+      var el = new Audio(AUDIO_DIR + rec.f);
+      var cayo = false;
+      this.stopAudio();
+      this.audioEl = el;
+      var falla = function () {
+        if (cayo || done || id !== self.run) return;
+        cayo = true;
+        if (self.audioEl === el) self.audioEl = null;
+        self.sayWithVoice(sc, id, next, est, t0);
+      };
+      el.onended = function () { if (self.audioEl === el) self.audioEl = null; advance(false); };
+      el.onerror = falla;
+      var p;
+      try { p = el.play(); } catch (e) { falla(); return; }
+      if (p && p.catch) p.catch(falla);
+      /* red de seguridad por si el navegador no avisa del final */
+      this.later(function () { if (!cayo) advance(false); }, (rec.d || est) * 1000 + 4000);
+      return;
+    }
+
+    /* 2 - la voz del propio navegador */
+    this.sayWithVoice(sc, id, next, est, t0);
+  }
+  sayWithVoice(sc, id, next, est, t0) {
+    var self = this;
     var synth = window.speechSynthesis;
     if (synth && window.SpeechSynthesisUtterance && (this.voiceList || []).length) {
       try {
         var u = new SpeechSynthesisUtterance(sc.say), v = this.voice();
-        if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = "es-ES"; }
+        try { if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = "es-ES"; } }
+        catch (e) { u.lang = "es-ES"; }
         u.rate = this.rate(); u.pitch = 1; u.volume = 1;
-        var sayN = sc.say.split(/\s+/).length, capN = sc.cap.split(" ").length;
-        u.onboundary = function (e) {
-          if (id !== self.run || (e.name && e.name !== "word")) return;
-          var spoken = sc.say.slice(0, e.charIndex).trim();
-          var n = spoken ? spoken.split(/\s+/).length : 0;
-          self.setState({ karaoke: true, word: Math.round(n * capN / sayN) });
-        };
         u.onend = next;
         u.onerror = function () { if (id !== self.run) return; self.later(next, Math.max(0, est * 1000 - (Date.now() - t0))); };
         this.utter = u;
@@ -873,7 +951,7 @@ class Component extends DCLogic {
   }
   renderVals() {
     var self = this, st = this.state, on = st.playing || st.finished, sc = SCENES[st.scene] || SCENES[0];
-    var cap = sc.cap.split(" ").map(function (w, i) { return { w: w, o: (!st.karaoke || i <= st.word) ? 1 : 0.38 }; });
+    var cap = sc.cap.split(" ").map(function (w) { return { w: w, o: 1 }; });
     var vals = {
       stars: this.stars, ring: this.ring, confetti: this.confetti, confetti2: this.confetti2, qr: this.qr, appTiles: this.appTiles,
       s0: on && st.scene === 0, s1: on && st.scene === 1, s2: on && st.scene === 2, s3: on && st.scene === 3, s4: on && st.scene === 4,
@@ -887,7 +965,7 @@ class Component extends DCLogic {
       capWords: cap,
       segs: SCENES.map(function (s, i) { return { cls: i < st.scene ? "done" : (i === st.scene && st.playing ? "now" : ""), dur: self.est(s).toFixed(2) }; }),
       voiceOpts: st.voices.length ? st.voices : [{ k: "", label: "Cargando voces…" }],
-      voiceKey: st.voiceKey, noVoice: false,
+      voiceKey: st.voiceKey, noVoice: false, recorded: hasRecording(), showVoicePick: !hasRecording(),
       words0: ["¿Y", "si", "aprender", "inglés", "fuera", "como"].map(function (t, i) { return { t: t, d: (0.15 + i * 0.22).toFixed(2) }; }),
       chips1: [["Gramática", "#a5b4fc"], ["Vocabulario", "#6ee7b7"], ["Writing", "#fcd34d"], ["Speaking", "#fda4af"], ["Lectura", "#7dd3fc"]].map(function (c, i) { return { t: c[0], c: c[1], b: c[1], d: (1.1 + i * 0.14).toFixed(2) }; }),
       grammar: [
@@ -917,11 +995,11 @@ class Component extends DCLogic {
         self.halt(); self.warm();
         var id = self.run;
         if (!(self.voiceList || []).length) self.loadVoices();
-        self.setState({ playing: true, finished: false, scene: 0, word: -1 });
+        self.setState({ playing: true, finished: false, scene: 0 });
         self.startMusic();
         self.later(function () { self.go(0, id); }, 450);
       },
-      stopIt: function () { self.halt(); self.setState({ playing: false, finished: false, scene: 0, word: -1 }); },
+      stopIt: function () { self.halt(); self.setState({ playing: false, finished: false, scene: 0 }); },
       toggleMusic: function () {
         var on2 = !self.state.music; self.setState({ music: on2 });
         if (!on2) self.stopMusic(0.3); else if (self.state.playing) self.startMusic(true);
@@ -936,7 +1014,7 @@ class Component extends DCLogic {
         } catch (e) {}
       }
     };
-    vals.noVoice = st.voices.length === 0 && !!this.voicesChecked;
+    vals.noVoice = !hasRecording() && st.voices.length === 0 && !!this.voicesChecked;
     return vals;
   }
 }

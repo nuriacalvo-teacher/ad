@@ -1,0 +1,116 @@
+# Graba los audios de los ejercicios de Listening y los sube al repositorio.
+#
+# No hace falta instalar nada ni abrir el terminal: se lanza desde la pestaña
+# "Actions" de GitHub, con el boton "Run workflow".
+#
+# Tarda entre 20 y 40 minutos (son 60 audios). Se puede cerrar la pagina
+# mientras tanto: sigue corriendo en los servidores de GitHub.
+
+name: Grabar la narracion del anuncio
+
+on:
+  workflow_dispatch:
+    inputs:
+      muestra:
+        description: 'Solo una muestra corta con las voces elegidas'
+        type: boolean
+        required: false
+        default: false
+      comparativa:
+        description: 'Solo una comparativa con TODAS las voces britanicas, para elegir'
+        type: boolean
+        required: false
+        default: false
+      only:
+        description: 'Solo este idioma (opcional). en o es'
+        required: false
+        default: ''
+      force:
+        description: 'Regrabar aunque la escena ya exista'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: grabar-audios
+  cancel-in-progress: false
+
+jobs:
+  grabar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar edge-tts
+        run: python -m pip install --upgrade pip edge-tts
+
+      - name: Grabar una muestra de las voces
+        if: ${{ inputs.muestra && !inputs.comparativa }}
+        run: python3 tools/build_ad.py --demo
+
+      - name: Grabar la comparativa de todas las voces
+        if: ${{ inputs.comparativa }}
+        run: python3 tools/build_ad.py --audition
+
+      - name: Dejar el audio listo para descargar
+        if: ${{ inputs.muestra || inputs.comparativa }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: voces-para-escuchar
+          path: |
+            audio/muestra-voces.mp3
+            audio/comparativa-voces.mp3
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Grabar la narracion
+        if: ${{ !inputs.muestra && !inputs.comparativa }}
+        env:
+          ONLY: ${{ inputs.only }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          if [ -n "${ONLY}" ]; then
+            # shellcheck disable=SC2206
+            ARGS+=(--lang ${ONLY})
+          fi
+          if [ "${FORCE}" = "true" ]; then
+            ARGS+=(--force)
+          fi
+          python3 tools/build_ad.py "${ARGS[@]}"
+
+      - name: Subir la narracion al repositorio
+        if: ${{ !inputs.muestra && !inputs.comparativa }}
+        run: |
+          set -euo pipefail
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add audio
+          if git diff --staged --quiet; then
+            echo 'No hay narracion nueva que subir.'
+            exit 0
+          fi
+          git commit -m 'Narracion del anuncio grabada automaticamente'
+          git push
+
+      - name: Resumen
+        if: ${{ always() && !inputs.muestra && !inputs.comparativa }}
+        run: |
+          if [ -f audio/manifest.json ]; then
+            python3 -c "import json; d=json.load(open('audio/manifest.json'))['langs']; print('## Narracion del anuncio\\n'); [print('- **%s** · %d escenas · %d min %02d s · voz %s' % (k.upper(), len(v['scenes']), sum(s['d'] for s in v['scenes'])//60, sum(s['d'] for s in v['scenes'])%60, v['voice'])) for k,v in sorted(d.items())]" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '## Narracion del anuncio' >> "$GITHUB_STEP_SUMMARY"
+            echo '' >> "$GITHUB_STEP_SUMMARY"
+            echo 'No se grabo nada. Revisa el registro del paso anterior.' >> "$GITHUB_STEP_SUMMARY"
+          fi
