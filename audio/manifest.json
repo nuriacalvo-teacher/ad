@@ -1,0 +1,115 @@
+{
+ "version": 1,
+ "langs": {
+  "en": {
+   "voice": "en-GB-SoniaNeural",
+   "scenes": [
+    {
+     "f": "en-0.mp3",
+     "d": 4.06,
+     "t": "What if learning English felt as exciting as your favourite game?"
+    },
+    {
+     "f": "en-1.mp3",
+     "d": 8.62,
+     "t": "Introducing English Apps: a whole collection of free, interactive apps for grammar, vocabulary, writing, speaking and reading."
+    },
+    {
+     "f": "en-2.mp3",
+     "d": 8.9,
+     "t": "Every single app was designed and built by an English teacher at I. E. S. Goya, in Zaragoza. Made in the classroom, for the classroom."
+    },
+    {
+     "f": "en-3.mp3",
+     "d": 9.43,
+     "t": "Master grammar, step by step: present tenses, past tenses, the future, conditionals, reported speech, and relative clauses."
+    },
+    {
+     "f": "en-4.mp3",
+     "d": 7.08,
+     "t": "Every exercise gives you instant feedback. Tap an answer, see if you're right, and watch your score grow."
+    },
+    {
+     "f": "en-5.mp3",
+     "d": 7.27,
+     "t": "Train irregular verbs, and get ready for B1 and B2 exams, with reading, listening, writing and speaking."
+    },
+    {
+     "f": "en-6.mp3",
+     "d": 7.18,
+     "t": "Then, turn your classroom into an arena! Team battles, and escape rooms, racing against the clock."
+    },
+    {
+     "f": "en-7.mp3",
+     "d": 8.88,
+     "t": "Using it couldn't be easier. Choose an app. Practise. Then project the QR code, and the whole class joins in seconds."
+    },
+    {
+     "f": "en-8.mp3",
+     "d": 8.57,
+     "t": "It's completely free. No sign-up. No installation. On your phone, your tablet, or the digital whiteboard."
+    },
+    {
+     "f": "en-9.mp3",
+     "d": 5.04,
+     "t": "English Apps. Start learning today. The link is on your screen!"
+    }
+   ]
+  },
+  "es": {
+   "voice": "es-ES-ElviraNeural",
+   "scenes": [
+    {
+     "f": "es-0.mp3",
+     "d": 4.73,
+     "t": "¿Y si aprender inglés fuera tan emocionante como tu videojuego favorito?"
+    },
+    {
+     "f": "es-1.mp3",
+     "d": 10.51,
+     "t": "Te presentamos English Apps: una colección de aplicaciones interactivas y gratuitas para practicar gramática, vocabulario, expresión escrita, expresión oral y lectura."
+    },
+    {
+     "f": "es-2.mp3",
+     "d": 9.34,
+     "t": "Todas y cada una de ellas las ha creado Nuria Calvo, profesora de inglés del instituto Goya, de Zaragoza. Hechas en el aula, para el aula."
+    },
+    {
+     "f": "es-3.mp3",
+     "d": 9.17,
+     "t": "Domina la gramática paso a paso: los tiempos presentes, los pasados, el futuro, los condicionales, el estilo indirecto y las oraciones de relativo."
+    },
+    {
+     "f": "es-4.mp3",
+     "d": 8.33,
+     "t": "Cada ejercicio se corrige al instante. Toca una respuesta, comprueba si has acertado, y mira cómo sube tu puntuación."
+    },
+    {
+     "f": "es-5.mp3",
+     "d": 7.22,
+     "t": "Entrena los verbos irregulares y prepárate para los exámenes de B1 y B2, practicando las cuatro destrezas."
+    },
+    {
+     "f": "es-6.mp3",
+     "d": 7.44,
+     "t": "Y después, ¡convierte tu clase en una arena! Batallas por equipos y escape rooms, contra el reloj."
+    },
+    {
+     "f": "es-7.mp3",
+     "d": 10.73,
+     "t": "Usarlo no puede ser más fácil. Elige una app. Practica. Proyecta el código QR, y toda la clase entra en segundos."
+    },
+    {
+     "f": "es-8.mp3",
+     "d": 10.13,
+     "t": "Es totalmente gratis. Sin registro. Sin instalar nada. En tu móvil, en tu tablet o en la pizarra digital."
+    },
+    {
+     "f": "es-9.mp3",
+     "d": 7.99,
+     "t": "English Apps, de Nuria Calvo. Empieza a aprender hoy mismo. ¡Tienes el enlace en pantalla!"
+    }
+   ]
+  }
+ }
+}
