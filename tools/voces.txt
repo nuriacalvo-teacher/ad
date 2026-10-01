@@ -1,0 +1,10 @@
+# Voces que narran el anuncio.
+#
+# Para cambiarlas:
+#   1. Haz doble clic en COMPARAR-VOCES.command y escucha la comparativa.
+#   2. Escribe aqui el nombre completo de las que mas te gusten.
+#   3. Haz doble clic en GRABAR-AUDIOS.command. Si ya habias grabado, usa
+#      la opcion --force o borra antes la carpeta audio/.
+
+voz_en = en-GB-SoniaNeural
+voz_es = es-ES-ElviraNeural

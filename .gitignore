@@ -1,0 +1,5 @@
+.venv-audio/
+__pycache__/
+.DS_Store
+audio/muestra-voces.mp3
+audio/comparativa-voces.mp3
